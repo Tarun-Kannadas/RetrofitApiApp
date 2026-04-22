@@ -16,6 +16,8 @@ class NoteViewModel: ViewModel() {
     private val _registerSuccess = MutableLiveData<Boolean>()
     val registerSuccess: LiveData<Boolean> = _registerSuccess
 
+    private var currentUserId: String? = null
+
     fun registerUser(name: String, email: String, pass: String) {
         viewModelScope.launch {
             try {
@@ -41,20 +43,16 @@ class NoteViewModel: ViewModel() {
                 if(response.isSuccessful){
                     val authData = response.body()
 
-                    RetrofitClient.currentUserId = authData?.userId
-                    println("Login success! User ID: ${RetrofitClient.currentUserId}")
+                    currentUserId = authData?.userId
+                    println("Login success! User ID: $currentUserId")
 
                     _loginSuccess.value = true
-
                     fetchNotes()
-                }
-                else{
+                } else {
                     _loginSuccess.value = false
                     println("Login failed: ${response.errorBody()?.string()}")
                 }
-            }
-            catch (e: Exception)
-            {
+            } catch (e: Exception) {
                 _loginSuccess.value = false
                 println("Network Error: ${e.message}")
             }
@@ -62,29 +60,31 @@ class NoteViewModel: ViewModel() {
     }
 
     fun fetchNotes() {
+        val userId = currentUserId ?: return
+
         viewModelScope.launch {
             try {
-                val response = RetrofitClient.apiService.getNotes()
+                val response = RetrofitClient.apiService.getNotes(userId)
                 if(response.isSuccessful){
                     val noteList = response.body() ?: emptyList()
                     _notes.value = noteList
                     println("Successfully fetched ${noteList.size} notes!")
-                }
-                else{
+                } else {
                     println("Error fetching notes: ${response.errorBody()?.string()}")
                 }
-            }
-            catch (e: Exception) {
+            } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
     }
 
     fun addNote(title: String, content: String) {
+        val userId = currentUserId ?: return
+
         viewModelScope.launch {
             try {
                 val newNote = NoteRequest(title, content)
-                val response = RetrofitClient.apiService.createNote(newNote)
+                val response = RetrofitClient.apiService.createNote(userId, newNote)
 
                 if (response.isSuccessful) {
                     fetchNotes()
@@ -98,10 +98,12 @@ class NoteViewModel: ViewModel() {
     }
 
     fun updateNote(id: String, newTitle: String, newContent: String) {
+        val userId = currentUserId ?: return
+
         viewModelScope.launch {
             try {
                 val updatedNote = NoteRequest(newTitle, newContent)
-                val response = RetrofitClient.apiService.updateNote(id, updatedNote)
+                val response = RetrofitClient.apiService.updateNote(userId, id, updatedNote)
 
                 if (response.isSuccessful) {
                     fetchNotes()
@@ -115,19 +117,18 @@ class NoteViewModel: ViewModel() {
     }
 
     fun deleteNotes(id: String) {
+        val userId = currentUserId ?: return
+
         viewModelScope.launch {
             try {
-                val response = RetrofitClient.apiService.deleteNote(id)
+                val response = RetrofitClient.apiService.deleteNote(userId, id)
 
                 if(response.isSuccessful){
                     fetchNotes()
+                } else {
+                    println("Failed to delete note: ${response.errorBody()?.string()}")
                 }
-                else
-                {
-                    println("Failed to delete note: ${response.errorBody()?.toString()}")
-                }
-            }
-            catch (e: Exception) {
+            } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
@@ -138,10 +139,8 @@ class NoteViewModel: ViewModel() {
     }
 
     fun logoutUser() {
-        RetrofitClient.currentUserId = null
-
+        currentUserId = null
         _notes.value = emptyList()
-
         _loginSuccess.value = false
     }
 }

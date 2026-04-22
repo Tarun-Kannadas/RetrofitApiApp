@@ -9,25 +9,11 @@ import okhttp3.logging.HttpLoggingInterceptor
 object RetrofitClient {
     private const val BASE_URL = "http://10.0.2.2:3000"
 
-    var currentUserId: String? = null
-
-    private val userIdInterceptor = Interceptor { chain ->
-        val originalRequest = chain.request()
-
-        val requestBuilder = originalRequest.newBuilder()
-        currentUserId?.let {
-            requestBuilder.addHeader("user-id", it)
-        }
-
-        chain.proceed(requestBuilder.build())
-    }
-
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
     }
 
     private val okHttpClient = OkHttpClient.Builder()
-        .addInterceptor(userIdInterceptor)
         .addInterceptor(loggingInterceptor)
         .build()
 
